@@ -119,12 +119,13 @@ const getFileManifestEntries = (input) => {
     }
   }
 
-  const relativeFileDetails = fileDetails.map((singeFileDetails) => {
+  // Take absolute file paths and make them relative.
+  const relativeFilePathDetails = fileDetails.map((singeFileDetails) => {
     singeFileDetails.file = path.relative(rootDirectory, singeFileDetails.file);
     return singeFileDetails;
   });
 
-  return Promise.resolve(filterFiles(relativeFileDetails, input));
+  return Promise.resolve(filterFiles(relativeFilePathDetails, input));
 };
 
 module.exports = getFileManifestEntries;
