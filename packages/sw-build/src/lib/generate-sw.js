@@ -68,6 +68,7 @@ const generateSW = function(input) {
   const globIgnores = input.globIgnores ? input.globIgnores : [];
   const dest = input.dest;
   const templatedUrls = input.templatedUrls;
+  const maximumFileSizeToCacheInBytes = input.maximumFileSizeToCacheInBytes;
 
   let swlibPath;
   return copySWLib(rootDirectory)
@@ -77,7 +78,13 @@ const generateSW = function(input) {
   })
   .then(() => {
     return getFileManifestEntries(
-      {staticFileGlobs, globIgnores, rootDirectory, templatedUrls});
+      {
+        staticFileGlobs,
+        globIgnores,
+        rootDirectory,
+        templatedUrls,
+        maximumFileSizeToCacheInBytes,
+      });
   })
   .then((manifestEntries) => {
     return writeServiceWorker(

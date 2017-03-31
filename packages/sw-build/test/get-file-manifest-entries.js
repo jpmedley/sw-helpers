@@ -1,4 +1,5 @@
 const proxyquire = require('proxyquire');
+const path = require('path');
 
 const swBuild = require('../src/index.js');
 const errors = require('../src/lib/errors');
@@ -82,7 +83,34 @@ describe('Test getFileManifestEntries', function() {
     }, Promise.resolve());
   });
 
-  it('should return file entries through each phase', function() {
+  it('should be able to handle a bad maximumFileSizeToCacheInBytes input', function() {
+    const badInput = [
+      null,
+      '',
+      [],
+      true,
+      false,
+      {},
+    ];
+    return badInput.reduce((promiseChain, input) => {
+      return promiseChain.then(() => {
+        let args = Object.assign({}, EXAMPLE_INPUT);
+        args.maximumFileSizeToCacheInBytes = input;
+        return swBuild.getFileManifestEntries(args)
+        .then(() => {
+          console.log('Input did not cause error: ', input);
+          throw new Error('Expected to throw error.');
+        })
+        .catch((err) => {
+          if (err.message !== errors['invalid-max-file-size']) {
+            throw new Error('Unexpected error: ' + err.message);
+          }
+        });
+      });
+    }, Promise.resolve());
+  });
+
+  it('should return expeceted files.', function() {
     const testInput = {
       staticFileGlobs: [
         './glob-1',
@@ -93,16 +121,27 @@ describe('Test getFileManifestEntries', function() {
         './glob-ignore-2',
       ],
       rootDirectory: '.',
+      maximumFileSizeToCacheInBytes: 2,
     };
-    const FILE_ENTRIES = [{
-      file: './glob-entry-1',
-      hash: '1234',
-      size: 1,
-    }, {
-      file: './glob-entry-2',
-      hash: '4321',
-      size: 2,
-    }];
+    const EXPECTED_ENTRIES = [
+      {
+        file: path.resolve('glob-entry-1'),
+        expectedUrl: '/glob-entry-1',
+        hash: '1234',
+        size: 1,
+      }, {
+        file: path.resolve('glob-entry-2'),
+        expectedUrl: '/glob-entry-2',
+        hash: '4321',
+        size: 2,
+      },
+    ];
+    const FILE_ENTRIES = EXPECTED_ENTRIES.concat([{
+      file: path.resolve('glob-entry-3'),
+      expectedUrl: '/glob-entry-3',
+      hash: '54321',
+      size: 3,
+    }]);
     const getFileManifestEntries = proxyquire(
       '../src/lib/get-file-manifest-entries.js', {
         './utils/get-file-details': (rootDirectory, globPattern, globIgnores) => {
@@ -110,7 +149,7 @@ describe('Test getFileManifestEntries', function() {
             throw new Error('Invalid glob ignores value.');
           }
 
-          if (rootDirectory !== testInput.rootDirectory) {
+          if (rootDirectory !== path.resolve(testInput.rootDirectory)) {
             throw new Error('Invalid rootDirectory value.');
           }
 
@@ -120,38 +159,21 @@ describe('Test getFileManifestEntries', function() {
 
           return FILE_ENTRIES;
         },
-        './utils/filter-files': (entries) =>{
-          entries.forEach((entry) => {
-            let matchingOracle = null;
-            FILE_ENTRIES.forEach((oracleEntry) => {
-              if (entry.file === oracleEntry.file) {
-                matchingOracle = oracleEntry;
-              }
-            });
-            if (!matchingOracle || entry.hash !== matchingOracle.hash || entry.size !== matchingOracle.size) {
-              throw new Error('Could not find matching file entry.');
-            }
-          });
-
-          if (entries.length !== FILE_ENTRIES.length) {
-            throw new Error('Unexpected file entries - should have duplicates removed.');
-          }
-          return entries;
-        },
       }
     );
 
     return getFileManifestEntries(testInput)
     .then((output) => {
+      output.length.should.equal(EXPECTED_ENTRIES.length);
       output.forEach((entry) => {
         let matchingOracle = null;
-        FILE_ENTRIES.forEach((oracleEntry) => {
-          if (entry.file === oracleEntry.file) {
+        EXPECTED_ENTRIES.forEach((oracleEntry) => {
+          if (entry.url === oracleEntry.expectedUrl) {
             matchingOracle = oracleEntry;
           }
         });
-        if (!matchingOracle || entry.hash !== matchingOracle.hash || entry.size !== matchingOracle.size) {
-          throw new Error('Could not find matching file entry.');
+        if (!matchingOracle || entry.revision !== matchingOracle.hash) {
+          throw new Error('Unexpected entry returned');
         }
       });
     });

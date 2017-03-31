@@ -1,3 +1,4 @@
+const path = require('path');
 const errors = require('./errors');
 const filterFiles = require('./utils/filter-files');
 const getCompositeDetails = require('./utils/get-composite-details');
@@ -36,15 +37,16 @@ const getFileManifestEntries = (input) => {
     throw new Error(errors['invalid-get-manifest-entries-input']);
   }
 
-  const staticFileGlobs = input.staticFileGlobs;
-  const globIgnores = input.globIgnores ? input.globIgnores : [];
-  const rootDirectory = input.rootDirectory;
-  const templatedUrls = input.templatedUrls;
-
-  if (typeof rootDirectory !== 'string' || rootDirectory.length === 0) {
+  if (typeof input.rootDirectory !== 'string' ||
+    input.rootDirectory.length === 0) {
     return Promise.reject(
       new Error(errors['invalid-root-directory']));
   }
+
+  const staticFileGlobs = input.staticFileGlobs;
+  const globIgnores = input.globIgnores ? input.globIgnores : [];
+  const rootDirectory = path.resolve(input.rootDirectory);
+  const templatedUrls = input.templatedUrls;
 
   if (!staticFileGlobs || !Array.isArray(staticFileGlobs)) {
     return Promise.reject(
@@ -65,6 +67,11 @@ const getFileManifestEntries = (input) => {
   if (!validIgnores) {
     return Promise.reject(
       new Error(errors['invalid-glob-ignores']));
+  }
+
+  if (typeof input.maximumFileSizeToCacheInBytes !== 'undefined' &&
+    typeof input.maximumFileSizeToCacheInBytes !== 'number') {
+    return Promise.reject(new Error(errors['invalid-max-file-size']));
   }
 
   const fileSet = new Set();
@@ -112,7 +119,12 @@ const getFileManifestEntries = (input) => {
     }
   }
 
-  return Promise.resolve(filterFiles(fileDetails));
+  const relativeFileDetails = fileDetails.map((singeFileDetails) => {
+    singeFileDetails.file = path.relative(rootDirectory, singeFileDetails.file);
+    return singeFileDetails;
+  });
+
+  return Promise.resolve(filterFiles(relativeFileDetails, input));
 };
 
 module.exports = getFileManifestEntries;

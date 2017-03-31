@@ -57,4 +57,6 @@ module.exports = {
     `is already being tracked via staticFileGlobs: `,
   'invalid-glob-ignores': `The 'globIgnore' parameter must be an ` +
     `array string glob patterns.`,
+  'invalid-max-file-size': `The 'maximumFileSizeToCacheInBytes' parameter ` +
+    `must be a number.`,
 };
